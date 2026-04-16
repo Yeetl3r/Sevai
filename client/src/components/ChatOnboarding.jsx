@@ -4,6 +4,7 @@ import { t } from '../data/strings.js';
 import { DISTRICTS } from '../data/districts.js';
 import { speak, stopSpeaking, createRecorder } from '../utils/speechUtils.js';
 import { ageBandToNumber, incomeBandToMax, occupationKey } from '../utils/formatters.js';
+import DocumentScanner from './DocumentScanner.jsx';
 
 // WhatsApp-style chat onboarding. Bot asks questions one at a time, large options below.
 
@@ -149,6 +150,24 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
   };
 
   const rejectPending = () => setPendingAnswer(null);
+
+  const handleDocumentScan = (data) => {
+    // If fallback is true, the user exhausted 3 attempts or closed the scanner
+    if (data.fallback) {
+      // Just keep them on the manual buttons
+      return;
+    }
+    
+    // Otherwise we successfully extracted the field
+    if (data && data.value) {
+       setPendingAnswer({
+           field: step.key,
+           value: data.value,
+           text: String(data.value),
+           confidence: 1.0 // OCR assumes high confidence here
+       });
+    }
+  };
 
   // When all steps done, fire final animation + onComplete
   useEffect(() => {
@@ -354,6 +373,15 @@ export default function ChatOnboarding({ onComplete, lang, setLang }) {
         <div className="bg-white rounded-2xl p-3 text-brand-ink">
           {options}
         </div>
+
+        {/* Global Smart Scanner Injection */}
+        {options && step && step.key !== 'language' && (
+          <DocumentScanner 
+             lang={lang} 
+             stepKey={step.key} 
+             onDataExtracted={handleDocumentScan} 
+          />
+        )}
 
         {/* Mic */}
         <div className="flex justify-center mt-3">

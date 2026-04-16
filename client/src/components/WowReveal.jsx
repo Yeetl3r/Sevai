@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { t } from '../data/strings.js';
 import { formatRupees } from '../utils/formatters.js';
-import { speak } from '../utils/speechUtils.js';
+import { speakImperative } from '../hooks/useTTS.js';
 
 // Full-screen reveal after onboarding. Counts up N schemes + total ₹ value.
 export default function WowReveal({ count, totalValue, lang, onContinue }) {
@@ -22,9 +22,9 @@ export default function WowReveal({ count, totalValue, lang, onContinue }) {
     };
     raf = requestAnimationFrame(tick);
 
-    // Celebratory TTS
+    // Celebratory TTS via ElevenLabs
     const msg = t('wow_qualify_for', lang).replace('[N]', String(count));
-    speak(msg, lang);
+    speakImperative(msg, lang);
 
     const auto = setTimeout(() => onContinue(), 3200);
     return () => {

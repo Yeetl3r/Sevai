@@ -2,13 +2,15 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { t, tf } from '../data/strings.js';
 import { formatTime, formatTimeTa } from '../utils/formatters.js';
-import { playSuccessChime, speak } from '../utils/speechUtils.js';
+import { playSuccessChime } from '../utils/speechUtils.js';
+import { speakImperative } from '../hooks/useTTS.js';
 
 export default function SuccessAnimation({ schemeName, elapsedSeconds, lang, onDone }) {
   useEffect(() => {
     playSuccessChime();
     const msg = t('apply_success', lang);
-    speak(msg, lang);
+    // Speak success message via ElevenLabs (fire-and-forget)
+    speakImperative(msg, lang);
     const timer = setTimeout(() => onDone?.(), 2200);
     return () => clearTimeout(timer);
   }, [lang, onDone]);

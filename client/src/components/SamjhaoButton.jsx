@@ -1,23 +1,34 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { t } from '../data/strings.js';
-import { speak, stopSpeaking } from '../utils/speechUtils.js';
+import { useTTS } from '../hooks/useTTS.js';
 
-// "Kelungal" button. Fetches summary from backend, caches locally, TTS with waveform.
+// "Kelungal" button — fetch Claude summary → ElevenLabs TTS with waveform.
 const localCache = new Map();
 
 export default function SamjhaoButton({ scheme, lang }) {
-  const [state, setState] = useState('idle'); // idle | loading | playing | paused
+  const { speak, stop, isPlaying, isLoading } = useTTS();
   const [bullets, setBullets] = useState([]);
   const [audioText, setAudioText] = useState('');
   const [error, setError] = useState(null);
-  const speakingRef = useRef(false);
+  // Track whether THIS button is the one currently active
+  const [active, setActive] = useState(false);
+  const activeRef = useRef(false);
 
+  // When isPlaying goes false externally (another button started), deactivate
+  useEffect(() => {
+    if (!isPlaying && activeRef.current) {
+      setActive(false);
+      activeRef.current = false;
+    }
+  }, [isPlaying]);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (speakingRef.current) stopSpeaking();
+      if (activeRef.current) stop();
     };
-  }, []);
+  }, [stop]);
 
   const fetchSummary = async () => {
     const key = `${scheme.id}:${lang}`;
@@ -35,70 +46,70 @@ export default function SamjhaoButton({ scheme, lang }) {
 
   const handleClick = async (e) => {
     e.stopPropagation();
-    if (state === 'playing') {
-      stopSpeaking();
-      speakingRef.current = false;
-      setState('paused');
+
+    // If THIS button is playing → stop
+    if (active && isPlaying) {
+      stop();
+      setActive(false);
+      activeRef.current = false;
       return;
     }
-    if (state === 'paused') {
-      setState('playing');
-      speakingRef.current = true;
-      speak(audioText, lang, { onEnd: () => { speakingRef.current = false; setState('idle'); } });
-      return;
-    }
-    setState('loading');
+
     setError(null);
-    try {
-      const data = await fetchSummary();
-      setBullets(data.bullets || []);
-      setAudioText(data.audio_text || (data.bullets || []).join(' '));
-      setState('playing');
-      speakingRef.current = true;
-      speak(data.audio_text || (data.bullets || []).join(' '), lang, {
-        onEnd: () => { speakingRef.current = false; setState('idle'); },
-      });
-    } catch (err) {
-      // Fall back to local description_simple bullets
-      const fallback = scheme.description_simple || [];
-      setBullets(fallback);
-      const joined = fallback.join('. ');
-      setAudioText(joined);
-      setState('playing');
-      speakingRef.current = true;
-      speak(joined, lang, {
-        onEnd: () => { speakingRef.current = false; setState('idle'); },
-      });
-      setError(lang === 'ta' ? 'சுருக்கம் உள்ளூர் தகவலில் இருந்து' : 'Summary from local data');
+    let textToSpeak = audioText;
+    let bulletsToShow = bullets;
+
+    // Need to fetch summary first?
+    if (!textToSpeak) {
+      try {
+        const data = await fetchSummary();
+        bulletsToShow = data.bullets || [];
+        textToSpeak = data.audio_text || bulletsToShow.join('. ');
+        setBullets(bulletsToShow);
+        setAudioText(textToSpeak);
+      } catch {
+        const fallback = scheme.description_simple || [];
+        bulletsToShow = fallback;
+        textToSpeak = fallback.join('. ');
+        setBullets(fallback);
+        setAudioText(textToSpeak);
+        setError(lang === 'ta' ? 'சுருக்கம் உள்ளூர் தகவலில் இருந்து' : 'Summary from local data');
+      }
     }
+
+    setActive(true);
+    activeRef.current = true;
+    speak(textToSpeak, lang, {
+      onEnd: () => {
+        setActive(false);
+        activeRef.current = false;
+      },
+    });
   };
+
+  // Determine display state: loading = fetching summary OR waiting for audio
+  const showLoading = isLoading && active;
+  const showPlaying = isPlaying && active;
 
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <button
         onClick={handleClick}
-        className="w-full bg-brand-green text-white rounded-2xl px-5 py-4 text-lg font-bold shadow-card active:scale-95 transition-transform flex items-center justify-center gap-3"
+        disabled={isLoading && !active} // disabled only if another button is loading
+        className="w-full bg-brand-green text-white rounded-2xl px-5 py-4 text-lg font-bold shadow-card active:scale-95 transition-transform flex items-center justify-center gap-3 disabled:opacity-60"
       >
-        {state === 'loading' && (
-          <span className="inline-block">⏳</span>
+        {showLoading ? (
+          <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+        ) : showPlaying ? (
+          <WaveformBars />
+        ) : (
+          <span className="text-xl">🔊</span>
         )}
-        {state === 'playing' && (
-          <span className="flex items-end h-6 gap-0.5 text-white">
-            <span className="wave-bar h-4" />
-            <span className="wave-bar h-6" />
-            <span className="wave-bar h-3" />
-            <span className="wave-bar h-5" />
-            <span className="wave-bar h-4" />
-          </span>
-        )}
-        {state !== 'loading' && state !== 'playing' && <span className="text-xl">🔊</span>}
         <span>
-          {state === 'loading'
+          {showLoading
             ? lang === 'ta' ? 'தயாராகிறது...' : 'Preparing...'
-            : state === 'playing'
-            ? lang === 'ta' ? 'பேசிக்கொண்டிருக்கிறது... (தடுக்க தட்டு)' : 'Playing... (tap to pause)'
-            : state === 'paused'
-            ? lang === 'ta' ? 'தொடர தட்டு' : 'Tap to resume'
+            : showPlaying
+            ? lang === 'ta' ? 'பேசிக்கொண்டிருக்கிறது... (தடுக்க தட்டு)' : 'Playing… (tap to stop)'
             : t('listen_kelungal', lang)}
         </span>
       </button>
@@ -113,7 +124,7 @@ export default function SamjhaoButton({ scheme, lang }) {
           >
             {bullets.map((b, i) => (
               <li key={i} className="flex gap-2">
-                <span className="text-brand-green font-bold">✓</span>
+                <span className="text-brand-green font-bold flex-shrink-0">✓</span>
                 <span>{b.replace(/^[✓\-•]\s*/, '')}</span>
               </li>
             ))}
@@ -122,5 +133,19 @@ export default function SamjhaoButton({ scheme, lang }) {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function WaveformBars() {
+  return (
+    <span className="flex items-end h-6 gap-[3px]">
+      {[4, 6, 3, 5, 4].map((h, i) => (
+        <span
+          key={i}
+          className="w-1 rounded-full bg-white wave-bar"
+          style={{ height: `${h * 4}px`, animationDelay: `${i * 80}ms` }}
+        />
+      ))}
+    </span>
   );
 }

@@ -38,6 +38,16 @@ export function initDB() {
       applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_phone) REFERENCES users(phone)
     );
+
+    CREATE TABLE IF NOT EXISTS access_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_phone TEXT,
+      token TEXT UNIQUE,
+      expires_at DATETIME,
+      is_revoked BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_phone) REFERENCES users(phone)
+    );
   `);
   console.log('✓ Database initialized at', DB_PATH);
 }
