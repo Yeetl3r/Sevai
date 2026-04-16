@@ -28,12 +28,3 @@ Client runs at http://localhost:5173. Server at http://localhost:5000.
 ## Privacy
 The Citizen Identity Vault is stored encrypted on-device in localStorage. It is never transmitted to any server.
 
-## Demo flow
-1. Fresh load → WhatsApp-style Tamil onboarding
-2. Complete ~90s → WOW MOMENT reveal
-3. Feed of matched schemes → tap Kelungal (Listen) → audio plays
-4. Apply Now → auto-filled form → mock camera → success animation
-5. Cross-scheme chaining suggests Fasal Bima
-6. Applications tab → status timeline → fix rejected
-7. Profile → Sahayak mode with mock codes: `100100`, `200200`, `300300`
-8. Language toggle switches everything live
