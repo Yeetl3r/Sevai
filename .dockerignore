@@ -1,0 +1,12 @@
+node_modules
+client/node_modules
+server/node_modules
+.env
+server/.env
+*.log
+.git
+.DS_Store
+client/dist
+server/public
+sevai_scout.db-journal
+.vite

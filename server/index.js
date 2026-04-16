@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import intentExtraction from './routes/intentExtraction.js';
 import schemeSummarizer from './routes/schemeSummarizer.js';
@@ -14,8 +16,11 @@ import visionExtractor from './routes/visionExtractor.js';
 import tts from './routes/tts.js';
 import scraper from './routes/scraper.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 7860;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -30,6 +35,16 @@ app.use('/api/scraper', scraper);
 app.use('/api/whatsapp', whatsapp);
 app.use('/api/sms', sms);
 app.use('/api/secure/qr', qrSecure);
+
+// Serve Static Frontend
+app.use(express.static(path.join(__dirname, 'public')));
+
+// SPA Catch-all (for React routing)
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+});
 
 // Health check — useful for demo day ("is Claude/Gemini wired up?")
 app.get('/api/health', (_, res) => {
